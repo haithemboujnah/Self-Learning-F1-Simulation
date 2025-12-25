@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course F1 - Apprentissage Automatique</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Course F1 - Voitures Autonomes</h1>
+        <p class="subtitle">Les voitures apprennent à naviguer sur le circuit grâce au Machine Learning</p>
+        
+        <audio id="raceMusic" loop preload="auto">
+            <source src="{{ url_for('static', filename='media/song.mp3') }}" type="audio/mpeg">
+            Votre navigateur ne supporte pas l'élément audio.
+        </audio>
+        
+        <div class="music-controls">
+            <button id="musicToggle" class="btn btn-music">
+                <span id="musicIcon">🔇</span> Musique
+            </button>
+            <div class="volume-control">
+                <span>Volume:</span>
+                <input type="range" id="volumeSlider" min="0" max="100" value="50">
+                <span id="volumeValue">50%</span>
+            </div>
+        </div>
+        
+        <div class="game-container">
+            <div class="game-header">
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-start">
+                        <span class="btn-icon"></span> Démarrer la Course
+                    </button>
+                    <button id="stopBtn" class="btn btn-stop">
+                        <span class="btn-icon"></span> Arrêter
+                    </button>
+                    <button id="resetBtn" class="btn btn-reset">
+                        <span class="btn-icon"></span> Réinitialiser
+                    </button>
+                </div>
+                <div class="game-info">
+                    <div class="info-item">
+                        <span class="label">Temps:</span>
+                        <span id="gameTime">0</span>s
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Tours:</span>
+                        <span id="maxLaps">3</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Musique:</span>
+                        <span id="musicStatus">Arrêtée</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-area">
+                <canvas id="gameCanvas" width="800" height="500"></canvas>
+                <div class="instructions">
+                    <h3>Comment ça marche?</h3>
+                    <p>• Les voitures utilisent un réseau de neurones pour apprendre à conduire</p>
+                    <p>• Elles collectent des données à chaque tour pour améliorer leur conduite</p>
+                    <p>• Les lignes blanches représentent les "capteurs" des voitures</p>
+                    <p>• Les cercles verts sont les checkpoints</p>
+                    <div class="music-info">
+                        <p><strong>🎵 Musique en cours:</strong> <span id="songTitle">song.mp3</span></p>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="musicProgress"></div>
+                        </div>
+                        <div class="time-display">
+                            <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="leaderboard">
+                <h2>Classement</h2>
+                <table id="leaderboardTable">
+                    <thead>
+                        <tr>
+                            <th>Position</th>
+                            <th>Voiture</th>
+                            <th>Tours</th>
+                            <th>Progression</th>
+                            <th>Vitesse</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody">
+                       
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="ai-info">
+            <h3>Informations sur l'IA</h3>
+            <p>Chaque voiture utilise un réseau de neurones (MLP) avec:</p>
+            <ul>
+                <li>5 entrées (capteurs de distance)</li>
+                <li>2 couches cachées de 10 neurones chacune</li>
+                <li>2 sorties (accélération et direction)</li>
+                <li>Apprentissage par renforcement simple</li>
+            </ul>
+            <p>Les modèles sont réentraînés périodiquement avec les données collectées.</p>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
