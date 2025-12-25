@@ -45,6 +45,12 @@ def game_state():
     
     cars_data = []
     for car in game.cars:
+        final_position = None
+        for finisher in game.finished_cars:
+            if finisher['id'] == car.car_id:
+                final_position = finisher['position']
+                break
+        
         cars_data.append({
             'id': car.car_id,
             'x': car.x,
@@ -52,10 +58,12 @@ def game_state():
             'angle': car.angle,
             'speed': car.speed,
             'lap': car.lap,
-            'progress': car.progress,
+            'progress': min(car.progress, 3.0),  
             'color': car.color,
             'is_ai': True,
-            'crashed': car.crashed
+            'crashed': car.crashed,
+            'finished': car.car_id in [f['id'] for f in game.finished_cars],
+            'position': final_position
         })
     
     return jsonify({
@@ -63,7 +71,11 @@ def game_state():
         'track': game.track_segments,
         'checkpoints': game.checkpoints,
         'max_laps': game.max_laps,
-        'time': game.game_time
+        'time': game.game_time,
+        'race_finished': game.race_finished,
+        'winners': game.winners,
+        'finished_cars': game.finished_cars,
+        'cars_remaining': len(game.cars) - len(game.finished_cars)
     })
 
 @app.route('/api/test_car')

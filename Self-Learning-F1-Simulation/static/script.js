@@ -187,73 +187,6 @@ class GameRenderer {
             console.error('Erreur test:', error);
         }
     }
-
-    updateUI() {
-        if (!this.gameState) return;
-        
-        document.getElementById('gameTime').textContent = Math.floor(this.gameState.time / 20);
-        
-        this.updateLeaderboard();
-    }
-    
-    updateLeaderboard() {
-        if (!this.gameState || !this.gameState.cars) return;
-        
-        const tbody = document.getElementById('leaderboardBody');
-        tbody.innerHTML = '';
-        
-        const sortedCars = [...this.gameState.cars].sort((a, b) => {
-            if (b.progress !== a.progress) return b.progress - a.progress;
-            return b.last_checkpoint - a.last_checkpoint;
-        });
-        
-        sortedCars.forEach((car, index) => {
-            const row = document.createElement('tr');
-            
-            const positionCell = document.createElement('td');
-            positionCell.textContent = index + 1;
-            positionCell.style.fontWeight = 'bold';
-            positionCell.style.color = index === 0 ? '#ffd700' : '#fff';
-            
-            // Voiture
-            const carCell = document.createElement('td');
-            carCell.innerHTML = `<div style="display: flex; align-items: center; gap: 8px;">
-                <div style="width: 12px; height: 12px; background-color: ${car.color}; border-radius: 50%;"></div>
-                <span>Voiture ${car.id + 1}</span>
-            </div>`;
-            
-            // Tours
-            const lapCell = document.createElement('td');
-            lapCell.textContent = car.lap;
-            
-            // Progression
-            const progressCell = document.createElement('td');
-            progressCell.textContent = car.progress.toFixed(2);
-            
-            // Vitesse
-            const speedCell = document.createElement('td');
-            speedCell.textContent = car.speed.toFixed(1);
-            
-            // Statut
-            const statusCell = document.createElement('td');
-            if (car.crashed) {
-                statusCell.textContent = 'Accidenté';
-                statusCell.style.color = '#ff0000';
-            } else {
-                statusCell.textContent = 'En course';
-                statusCell.style.color = '#00ff00';
-            }
-            
-            row.appendChild(positionCell);
-            row.appendChild(carCell);
-            row.appendChild(lapCell);
-            row.appendChild(progressCell);
-            row.appendChild(speedCell);
-            row.appendChild(statusCell);
-            
-            tbody.appendChild(row);
-        });
-    }
     
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -381,6 +314,274 @@ class GameRenderer {
         });
     }
     
+    updateUI() {
+        if (!this.gameState) return;
+        
+        const totalSeconds = Math.floor(this.gameState.time / 20);
+
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+
+        document.getElementById('gameTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        this.updateLeaderboard();
+        
+        if (this.gameState.race_finished) {
+            this.showFinalResults();
+        }
+    }
+
+    updateLeaderboard() {
+        if (!this.gameState || !this.gameState.cars) return;
+        
+        const tbody = document.getElementById('leaderboardBody');
+        tbody.innerHTML = '';
+        
+        const sortedCars = [...this.gameState.cars].sort((a, b) => {
+            if (a.finished && b.finished) {
+                return a.position - b.position;
+            }
+            if (a.finished && !b.finished) {
+                return -1;
+            }
+            if (!a.finished && b.finished) {
+                return 1;
+            }
+            if (b.progress !== a.progress) return b.progress - a.progress;
+            return b.speed - a.speed;
+        });
+        
+        sortedCars.forEach((car, index) => {
+            const row = document.createElement('tr');
+            
+            const positionCell = document.createElement('td');
+            if (car.finished) {
+                switch(car.position) {
+                    case 1:
+                        positionCell.innerHTML = '🥇';
+                        positionCell.style.fontSize = '1.5rem';
+                        row.style.backgroundColor = 'rgba(255, 215, 0, 0.1)';
+                        break;
+                    case 2:
+                        positionCell.innerHTML = '🥈';
+                        positionCell.style.fontSize = '1.5rem';
+                        row.style.backgroundColor = 'rgba(192, 192, 192, 0.1)';
+                        break;
+                    case 3:
+                        positionCell.innerHTML = '🥉';
+                        positionCell.style.fontSize = '1.5rem';
+                        row.style.backgroundColor = 'rgba(205, 127, 50, 0.1)';
+                        break;
+                    default:
+                        positionCell.textContent = car.position;
+                        positionCell.style.fontWeight = 'bold';
+                        positionCell.style.color = '#fff';
+                }
+            } else {
+                positionCell.textContent = index + 1;
+                positionCell.style.fontWeight = 'bold';
+                positionCell.style.color = '#aaa';
+            }
+            
+            // Voiture
+            const carCell = document.createElement('td');
+            let statusIcon = '';
+            if (car.finished) {
+                statusIcon = '🏁';
+                if (car.position === 1) statusIcon = '👑';
+            } else if (car.crashed) {
+                statusIcon = '💥';
+            }
+            
+            carCell.innerHTML = `<div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 12px; height: 12px; background-color: ${car.color}; border-radius: 50%;"></div>
+                <span>Voiture ${car.id + 1}</span>
+                <span>${statusIcon}</span>
+            </div>`;
+            
+            // Tours
+            const lapCell = document.createElement('td');
+            lapCell.textContent = car.lap;
+            if (car.lap >= this.gameState.max_laps) {
+                lapCell.style.color = '#00ff00';
+                lapCell.style.fontWeight = 'bold';
+            }
+            
+            // Progression
+            const progressCell = document.createElement('td');
+            progressCell.textContent = car.progress.toFixed(2);
+            
+            // Vitesse
+            const speedCell = document.createElement('td');
+            speedCell.textContent = car.speed.toFixed(1);
+            
+            // Statut
+            const statusCell = document.createElement('td');
+            if (car.finished) {
+                statusCell.textContent = `Arrivée #${car.position}`;
+                switch(car.position) {
+                    case 1:
+                        statusCell.textContent = 'PREMIER 🏆';
+                        statusCell.style.color = '#ffd700';
+                        break;
+                    case 2:
+                        statusCell.textContent = 'DEUXIÈME 🥈';
+                        statusCell.style.color = '#c0c0c0';
+                        break;
+                    case 3:
+                        statusCell.textContent = 'TROISIÈME 🥉';
+                        statusCell.style.color = '#cd7f32';
+                        break;
+                    default:
+                        statusCell.textContent = `Position ${car.position}`;
+                        statusCell.style.color = '#649eb7ff';
+                }
+                statusCell.style.fontWeight = 'bold';
+            } else if (car.crashed) {
+                statusCell.textContent = 'Accidenté';
+                statusCell.style.color = '#ff0000';
+            } else {
+                statusCell.textContent = 'En course';
+                statusCell.style.color = '#00ff00';
+            }
+            
+            row.appendChild(positionCell);
+            row.appendChild(carCell);
+            row.appendChild(lapCell);
+            row.appendChild(progressCell);
+            row.appendChild(speedCell);
+            row.appendChild(statusCell);
+            
+            tbody.appendChild(row);
+        });
+        
+        const header = document.querySelector('.leaderboard h2');
+        if (header) {
+            if (this.gameState.race_finished) {
+                header.innerHTML = `🏁 CLASSEMENT FINAL 🏁`;
+                header.style.color = '#ffd700';
+            } else if (this.gameState.finished_cars.length > 0) {
+                const finishedCount = this.gameState.finished_cars.length;
+                const totalCars = this.gameState.cars.length;
+                header.innerHTML = `Classement (${finishedCount}/${totalCars} arrivées)`;
+                header.style.color = '#ffff00';
+            } else {
+                header.innerHTML = `Classement`;
+                header.style.color = '#ff0000';
+            }
+            header.style.textAlign = 'center';
+        }
+    }
+
+    showFinalResults() {
+        let resultsDiv = document.getElementById('finalResults');
+        
+        if (!resultsDiv) {
+            resultsDiv = document.createElement('div');
+            resultsDiv.id = 'finalResults';
+            resultsDiv.className = 'final-results';
+            
+            resultsDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                padding: 30px;
+                border-radius: 20px;
+                border: 5px solid #ffd700;
+                box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+                z-index: 1000;
+                text-align: center;
+                max-width: 600px;
+                width: 90%;
+            `;
+            
+            document.body.appendChild(resultsDiv);
+        }
+        
+        let resultsHTML = `
+            <h2 style="color: #ffd700; margin-bottom: 20px; font-size: 2rem;">🏁 COURSE TERMINÉE ! 🏁</h2>
+            <h3 style="color: #fff; margin-bottom: 20px;">Classement Final</h3>
+            <div style="margin-bottom: 30px;">
+        `;
+        
+        this.gameState.finished_cars.forEach((finisher, index) => {
+            const car = this.gameState.cars.find(c => c.id === finisher.id);
+            let medal = '';
+            let positionText = '';
+            
+            switch(finisher.position) {
+                case 1:
+                    medal = '🥇';
+                    positionText = 'PREMIÈRE PLACE';
+                    break;
+                case 2:
+                    medal = '🥈';
+                    positionText = 'DEUXIÈME PLACE';
+                    break;
+                case 3:
+                    medal = '🥉';
+                    positionText = 'TROISIÈME PLACE';
+                    break;
+                default:
+                    medal = '🏁';
+                    positionText = `${finisher.position}ème place`;
+            }
+            
+            resultsHTML += `
+                <div style="background: ${index < 3 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.3)'}; 
+                            padding: 15px; 
+                            margin: 10px 0; 
+                            border-radius: 10px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            border-left: 5px solid ${car ? car.color : '#fff'}">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="font-size: 2rem;">${medal}</span>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: ${car ? car.color : '#fff'}">
+                                Voiture ${finisher.id + 1}
+                            </div>
+                            <div style="color: #ccc;">${positionText}</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: #aaa;">Temps: ${Math.floor(finisher.finish_time / 20)}s</div>
+                        <div style="color: #aaa;">${finisher.lap} tours</div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        resultsHTML += `
+            </div>
+            <button id="newRaceBtn" style="background: linear-gradient(to right, #00b09b, #96c93d); 
+                                        color: white; 
+                                        padding: 15px 30px; 
+                                        border: none; 
+                                        border-radius: 10px; 
+                                        font-size: 1.2rem; 
+                                        cursor: pointer;
+                                        font-weight: bold;">
+                🏁 Nouvelle Course 🏁
+            </button>
+        `;
+        
+        resultsDiv.innerHTML = resultsHTML;
+        
+        document.getElementById('newRaceBtn').addEventListener('click', () => {
+            this.resetGame();
+            resultsDiv.remove();
+        });
+        
+        if (this.music && !this.music.paused) {
+            this.music.pause();
+            this.updateMusicUI(false);
+        }
+    }
+
     debugGameState() {
         if (!this.gameState || !this.gameState.cars) return;
         

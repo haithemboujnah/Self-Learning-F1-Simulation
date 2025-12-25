@@ -152,7 +152,7 @@ class CarAI:
         """Met à jour la position de la voiture"""
         if self.crashed:
             self.crash_time += 1
-            if self.crash_time > 40:  
+            if self.crash_time > 40:
                 self.respawn(checkpoints)
             return
         
@@ -196,9 +196,9 @@ class CarAI:
             self.training_targets.append([throttle, steering])
             self.rewards.append(reward)
             
-            if self.total_distance > 0:
-                distance_per_lap = 2000  
-                self.progress = self.lap + min((self.total_distance % distance_per_lap) / distance_per_lap, 0.99)
+            if len(checkpoints) > 0:
+                checkpoint_progress = self.last_checkpoint / len(checkpoints)
+                self.progress = self.lap + checkpoint_progress
             
             self.train_counter += 1
             if self.train_counter >= 50:
@@ -209,24 +209,34 @@ class CarAI:
         """Vérifie si la voiture a passé un checkpoint"""
         reward = 0
         
-        for i, (cx, cy, radius) in enumerate(checkpoints):
-            distance = math.sqrt((self.x - cx)**2 + (self.y - cy)**2)
+        current_idx = self.last_checkpoint
+        next_idx = (current_idx + 1) % len(checkpoints)
+        
+        cx, cy, radius = checkpoints[next_idx]
+        distance = math.sqrt((self.x - cx)**2 + (self.y - cy)**2)
+        
+        if distance <= radius + 15:
+            self.last_checkpoint = next_idx
+            self.checkpoint_counter += 1
+            reward = 20
             
-            if distance <= radius + 10:
-                if i == (self.last_checkpoint + 1) % len(checkpoints):
-                    self.last_checkpoint = i
-                    self.checkpoint_counter += 1
-                    reward = 20  
-                    
-                    if i == 0 and self.checkpoint_counter >= len(checkpoints):
-                        self.lap += 1
-                        self.progress = self.lap + self.checkpoint_counter / len(checkpoints)
-                        self.checkpoint_counter = 0
-                        reward = 50  
-                        
-                        self.retrain_model()
+            checkpoint_progress = next_idx / len(checkpoints)
+            self.progress = self.lap + checkpoint_progress
+            
+            if next_idx == 0:
+                self.lap += 1
+                reward = 50
+                self.progress = self.lap  
                 
-                break
+                if self.lap <= 3:  
+                    self.progress = self.lap
+                else:
+                    self.progress = 3.0 
+                
+                self.retrain_model()
+                
+                if self.lap <= 3:
+                    print(f"Voiture {self.car_id} - Tour {self.lap}/3 complété")
         
         return reward
     
@@ -259,6 +269,10 @@ class F1Game:
         self.max_laps = 3
         self.game_time = 0
         self.game_started = False
+        self.race_finished = False
+        self.winners = []  
+        self.finished_cars = []
+        self.race_start_time = 0
     
     def add_car(self, car):
         """Ajoute une voiture au jeu"""
@@ -285,21 +299,53 @@ class F1Game:
     
     def update(self):
         """Met à jour l'état du jeu"""
-        if not self.game_started:
-            return  
+        if not self.game_started or self.race_finished:
+            return
         
         self.game_time += 1
         
         for car in self.cars:
+            if car.car_id in [c['id'] for c in self.finished_cars]:
+                continue
+                
             car.update(self.track_segments, self.checkpoints)
             
-            if not car.crashed and car.speed < 0.5:
+            if car.lap >= self.max_laps and car.car_id not in [c['id'] for c in self.finished_cars]:
+                finish_time = self.game_time
+                position = len(self.finished_cars) + 1
+                
+                self.finished_cars.append({
+                    'id': car.car_id,
+                    'position': position,
+                    'finish_time': finish_time,
+                    'lap': car.lap,
+                    'progress': car.progress
+                })
+                
+                self.winners.append(car.car_id)
+                
+                print(f"🎯 Voiture {car.car_id + 1} arrive en position {position} !")
+                
+                car.speed = 0
+                car.crashed = False 
+                
+                if len(self.finished_cars) == len(self.cars):
+                    self.race_finished = True
+                    print(f"🏁 COURSE TERMINÉE ! Classement final:")
+                    for i, finisher in enumerate(self.finished_cars):
+                        print(f"{i+1}ère place: Voiture {finisher['id'] + 1}")
+            
+            if not car.crashed and car.speed < 0.5 and car.car_id not in [c['id'] for c in self.finished_cars]:
                 car.speed = min(car.speed + 0.1, 2.0)
     
     def reset(self):
         """Réinitialise le jeu"""
         self.game_time = 0
         self.game_started = False
+        self.race_finished = False
+        self.winners = []
+        self.finished_cars = []
+        self.race_start_time = 0
         
         for i, car in enumerate(self.cars):
             car.x = 100 + i * 40
