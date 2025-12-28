@@ -10,7 +10,11 @@ class GameRenderer {
         document.getElementById('stopBtn').addEventListener('click', () => this.stopGame());
         document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
         
-        this.init();
+        this.initializeApp();
+    }
+
+    async initializeApp() {
+        await this.init();
     }
     
     async init() {
@@ -602,7 +606,83 @@ class GameRenderer {
     }
 }
 
-setInterval(() => this.debugGameState(), 5000);
+class TrackSelectionModal {
+    constructor() {
+        this.modal = document.getElementById('trackSelectionModal');
+        this.trackOptions = document.querySelectorAll('.track-option');
+        this.cancelBtn = document.getElementById('cancelTrackSelect');
+        this.confirmBtn = document.getElementById('confirmTrackSelect');
+        this.startBtn = document.getElementById('startBtn');
+        this.selectedTrack = null;
+        
+        this.init();
+    }
+    
+    init() {
+        // Remplacer l'événement click du bouton Démarrer
+        this.startBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.show();
+        });
+        
+        // Gestion des sélections de circuit
+        this.trackOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                this.selectTrack(option);
+            });
+        });
+        
+        // Gestion des boutons de la modal
+        this.cancelBtn.addEventListener('click', () => this.hide());
+        this.confirmBtn.addEventListener('click', () => this.startGameWithTrack());
+    }
+    
+    show() {
+        this.modal.style.display = 'flex';
+        document.querySelector('.container').style.filter = 'blur(5px)';
+    }
+    
+    hide() {
+        this.modal.style.display = 'none';
+        document.querySelector('.container').style.filter = 'none';
+        this.selectedTrack = null;
+        this.confirmBtn.disabled = true;
+        this.trackOptions.forEach(opt => opt.classList.remove('selected'));
+    }
+    
+    selectTrack(option) {
+        this.trackOptions.forEach(opt => opt.classList.remove('selected'));
+        option.classList.add('selected');
+        this.selectedTrack = option.dataset.track;
+        this.confirmBtn.disabled = false;
+    }
+    
+    async startGameWithTrack() {
+        if (!this.selectedTrack) return;
+        
+        try {
+            // Envoyer la sélection du circuit au backend
+            const response = await fetch('/api/set_track', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ track: this.selectedTrack })
+            });
+            
+            if (response.ok) {
+                this.hide();
+                // Démarrer le jeu normalement
+                const gameRenderer = window.gameRenderer;
+                if (gameRenderer) {
+                    await gameRenderer.startGame();
+                }
+            }
+        } catch (error) {
+            console.error('Erreur lors du choix du circuit:', error);
+        }
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     new GameRenderer();
